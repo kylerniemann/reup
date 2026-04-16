@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Reup</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>Reup</h1>
+      <p class="sub">Tracks visible reset times on supported sites.</p>
+
+      <section class="card">
+        <h2>Saved resets</h2>
+        <div id="watchers"></div>
+      </section>
+
+      <section class="card">
+        <h2>Settings</h2>
+        <label class="row">
+          <span>Notify early (minutes)</span>
+          <input id="notifyEarlyMinutes" type="number" min="0" max="120" step="1" />
+        </label>
+
+        <label class="row checkbox">
+          <input id="notificationsEnabled" type="checkbox" />
+          <span>Enable notifications</span>
+        </label>
+
+        <label class="row checkbox">
+          <input id="soundEnabled" type="checkbox" />
+          <span>Play Reup chime</span>
+        </label>
+
+        <div class="buttonRow">
+          <button id="saveBtn">Save settings</button>
+          <button id="testResetBtn" type="button">Test reset alert</button>
+          <button id="testSoonBtn" type="button">Test early alert</button>
+          <button id="testSoundBtn" type="button" class="secondary">Test chime</button>
+        </div>
+        <p id="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>Notification check</h2>
+        <div id="permissionPill" class="pill">Checking…</div>
+        <p class="small" id="permissionExplain"></p>
+        <div class="helpList">
+          <div><strong>Mac:</strong> System Settings → Notifications → Google Chrome → Allow Notifications</div>
+          <div><strong>Windows:</strong> Settings → System → Notifications → Google Chrome → On</div>
+          <div><strong>Also check:</strong> turn off Focus / Do Not Disturb, and make sure Chrome itself is allowed to show notifications.</div>
+        </div>
+        <p class="small">After changing those settings, click a test button above again.</p>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

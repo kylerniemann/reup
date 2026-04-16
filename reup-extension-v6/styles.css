@@ -1,0 +1,124 @@
+body {
+  margin: 0;
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #111;
+  color: #f5f5f5;
+  min-width: 380px;
+}
+
+.app {
+  padding: 16px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.sub,
+.muted,
+.small,
+#status {
+  color: #bbb;
+}
+
+.card {
+  background: #1c1c1c;
+  border: 1px solid #2d2d2d;
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 14px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.checkbox {
+  justify-content: flex-start;
+}
+
+input[type="number"] {
+  width: 80px;
+}
+
+button {
+  background: #2f6fed;
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #2b2b2b;
+  border: 1px solid #3a3a3a;
+}
+
+button:hover {
+  opacity: 0.92;
+}
+
+.watcher {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  border-top: 1px solid #2d2d2d;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.buttonRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.buttonRow button {
+  flex: 1 1 auto;
+}
+
+.pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #2b2b2b;
+  border: 1px solid #3a3a3a;
+  margin-bottom: 10px;
+}
+
+.pill.success {
+  background: rgba(37, 145, 80, 0.15);
+  border-color: rgba(37, 145, 80, 0.55);
+  color: #8ee2a8;
+}
+
+.pill.warning {
+  background: rgba(194, 144, 28, 0.15);
+  border-color: rgba(194, 144, 28, 0.55);
+  color: #f1d27d;
+}
+
+.pill.danger {
+  background: rgba(166, 52, 52, 0.18);
+  border-color: rgba(166, 52, 52, 0.55);
+  color: #ffaaaa;
+}
+
+.helpList {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  color: #d7d7d7;
+}
