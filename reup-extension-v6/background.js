@@ -1,25 +1,16 @@
 const DEFAULT_SETTINGS = {
   notifyEarlyMinutes: 5,
-  notificationsEnabled: true,
+  visualNotificationsEnabled: true,
   soundEnabled: true
 };
 
 chrome.runtime.onInstalled.addListener(async () => {
-  const existing = await chrome.storage.local.get(["settings", "watchers"]);
-  if (!existing.settings) {
-    await chrome.storage.local.set({ settings: DEFAULT_SETTINGS });
-  } else if (existing.settings.soundEnabled === undefined) {
-    await chrome.storage.local.set({
-      settings: { ...DEFAULT_SETTINGS, ...existing.settings, soundEnabled: true }
-    });
-  }
-  if (!existing.watchers) {
-    await chrome.storage.local.set({ watchers: {} });
-  }
+  await ensureStorageDefaults();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  await restoreAlarmsFromStorage();
+  const settings = await ensureStorageDefaults();
+  await restoreAlarmsFromStorage(settings);
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -38,6 +29,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "SAVE_SETTINGS") {
+    saveSettings(message.settings)
+      .then((settings) => sendResponse({ ok: true, settings }))
+      .catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
   if (message?.type === "CLEAR_SITE") {
     clearSite(message.site).then(() => sendResponse({ ok: true }));
     return true;
@@ -45,13 +43,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === "TEST_NOTIFICATION") {
     createTestNotification(message.kind)
-      .then((result) => sendResponse({ ok: true, soundPlayed: !!result?.soundPlayed }))
+      .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: String(error) }));
     return true;
   }
 
   if (message?.type === "PLAY_SOUND_ONLY") {
-    playChime(message.kind || 'reset')
+    playChime(message.kind || "reset")
       .then((played) => sendResponse({ ok: !!played, soundPlayed: !!played }))
       .catch((error) => sendResponse({ ok: false, error: String(error) }));
     return true;
@@ -62,55 +60,70 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (!alarm?.name) return;
 
   const [kind, site] = alarm.name.split("::");
-  const { watchers = {}, settings = DEFAULT_SETTINGS } = await chrome.storage.local.get([
+  const { watchers = {}, settings: storedSettings } = await chrome.storage.local.get([
     "watchers",
     "settings"
   ]);
 
   const watcher = watchers[site];
-  if (!watcher || !settings.notificationsEnabled) return;
+  if (!watcher) return;
 
-  if (kind === "early") {
-    await chrome.notifications.create(`early-${site}-${Date.now()}`, {
-      type: "basic",
-      iconUrl: "icons/icon128.png",
-      title: `${watcher.product} resets soon`,
-      message: `Usage should reset at ${formatLocalTime(watcher.resetAt)}.`,
-      priority: 2,
-      requireInteraction: true,
-      silent: false
-    });
-
-    if (settings.soundEnabled) {
-      await playChime('early');
-    }
-  }
-
-  if (kind === "reset") {
-    await chrome.notifications.create(`reset-${site}-${Date.now()}`, {
-      type: "basic",
-      iconUrl: "icons/icon128.png",
-      title: `${watcher.product} should be available again`,
-      message: `Your saved reset time has arrived.`,
-      priority: 2,
-      requireInteraction: true,
-      silent: false
-    });
-
-    if (settings.soundEnabled) {
-      await playChime('reset');
-    }
-  }
+  const settings = normalizeSettings(storedSettings);
+  await sendAlert(kind, {
+    site,
+    product: watcher.product,
+    resetAt: watcher.resetAt
+  }, settings);
 });
+
+async function ensureStorageDefaults() {
+  const existing = await chrome.storage.local.get(["settings", "watchers"]);
+  const settings = normalizeSettings(existing.settings);
+
+  if (!existing.settings || JSON.stringify(existing.settings) !== JSON.stringify(settings)) {
+    await chrome.storage.local.set({ settings });
+  }
+
+  if (!existing.watchers) {
+    await chrome.storage.local.set({ watchers: {} });
+  }
+
+  return settings;
+}
+
+function normalizeSettings(rawSettings = {}) {
+  const merged = { ...DEFAULT_SETTINGS, ...(rawSettings || {}) };
+
+  if (
+    rawSettings &&
+    rawSettings.notificationsEnabled !== undefined &&
+    rawSettings.visualNotificationsEnabled === undefined
+  ) {
+    merged.visualNotificationsEnabled = !!rawSettings.notificationsEnabled;
+  }
+
+  return {
+    notifyEarlyMinutes: clampMinutes(merged.notifyEarlyMinutes),
+    visualNotificationsEnabled: merged.visualNotificationsEnabled !== false,
+    soundEnabled: merged.soundEnabled !== false
+  };
+}
+
+function clampMinutes(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_SETTINGS.notifyEarlyMinutes;
+  return Math.max(0, Math.min(120, Math.round(parsed)));
+}
 
 async function handleDetectionResult(payload) {
   if (!payload?.site || !payload?.product) return;
 
-  const { watchers = {}, settings = DEFAULT_SETTINGS } = await chrome.storage.local.get([
+  const { watchers = {}, settings: storedSettings } = await chrome.storage.local.get([
     "watchers",
     "settings"
   ]);
 
+  const settings = normalizeSettings(storedSettings);
   const previous = watchers[payload.site];
   const next = {
     ...previous,
@@ -126,9 +139,20 @@ async function handleDetectionResult(payload) {
   }
 }
 
+async function saveSettings(nextSettings) {
+  const settings = normalizeSettings(nextSettings);
+  await chrome.storage.local.set({ settings });
+  await restoreAlarmsFromStorage(settings);
+  return settings;
+}
+
 async function scheduleSiteAlarms(site, resetAt, notifyEarlyMinutes) {
   await chrome.alarms.clear(`reset::${site}`);
   await chrome.alarms.clear(`early::${site}`);
+
+  if (!(resetAt && Number.isFinite(resetAt) && resetAt > Date.now())) {
+    return;
+  }
 
   await chrome.alarms.create(`reset::${site}`, {
     when: resetAt
@@ -142,16 +166,16 @@ async function scheduleSiteAlarms(site, resetAt, notifyEarlyMinutes) {
   }
 }
 
-async function restoreAlarmsFromStorage() {
-  const { watchers = {}, settings = DEFAULT_SETTINGS } = await chrome.storage.local.get([
+async function restoreAlarmsFromStorage(settingsInput) {
+  const { watchers = {}, settings: storedSettings } = await chrome.storage.local.get([
     "watchers",
     "settings"
   ]);
 
+  const settings = settingsInput || normalizeSettings(storedSettings);
+
   for (const [site, watcher] of Object.entries(watchers)) {
-    if (watcher?.resetAt && watcher.resetAt > Date.now()) {
-      await scheduleSiteAlarms(site, watcher.resetAt, settings.notifyEarlyMinutes);
-    }
+    await scheduleSiteAlarms(site, watcher?.resetAt, settings.notifyEarlyMinutes);
   }
 }
 
@@ -166,16 +190,18 @@ async function clearSite(site) {
 
 async function getState() {
   const data = await chrome.storage.local.get(["watchers", "settings"]);
-  let permissionLevel = 'unknown';
+  const settings = normalizeSettings(data.settings);
+  let permissionLevel = "unknown";
+
   try {
     permissionLevel = await chrome.notifications.getPermissionLevel();
   } catch (error) {
-    console.debug('getPermissionLevel unavailable', error);
+    console.debug("getPermissionLevel unavailable", error);
   }
 
   return {
     watchers: data.watchers || {},
-    settings: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
+    settings,
     notificationPermissionLevel: permissionLevel
   };
 }
@@ -191,60 +217,107 @@ function formatLocalTime(ts) {
   }
 }
 
-async function createTestNotification(kind = "reset") {
-  const titles = {
-    reset: "Codex should be available again",
-    early: "Claude resets soon"
-  };
+async function sendAlert(kind, payload, settings) {
+  const visualEnabled = settings.visualNotificationsEnabled;
+  const soundEnabled = settings.soundEnabled;
 
-  const messages = {
-    reset: "Test notification from Reup. Your saved reset time has arrived.",
-    early: `Test notification from Reup. Usage should reset at ${formatLocalTime(Date.now() + 5 * 60 * 1000)}.`
-  };
-
-  await chrome.notifications.create(`test-${kind}-${Date.now()}`, {
-    type: "basic",
-    iconUrl: "icons/icon128.png",
-    title: titles[kind] || "Reup test notification",
-    message: messages[kind] || "This is a test notification from Reup.",
-    priority: 2,
-    requireInteraction: true,
-    silent: false
-  });
-
-  const { settings = DEFAULT_SETTINGS } = await chrome.storage.local.get(["settings"]);
-  let soundPlayed = false;
-  if (settings.soundEnabled) {
-    soundPlayed = await playChime(kind === 'early' ? 'early' : 'reset');
+  if (!visualEnabled && !soundEnabled) {
+    return { visualDisplayed: false, soundPlayed: false };
   }
-  return { soundPlayed };
+
+  let visualDisplayed = false;
+  if (visualEnabled) {
+    visualDisplayed = await showNotification(kind, payload);
+  }
+
+  let soundPlayed = false;
+  if (soundEnabled) {
+    soundPlayed = await playChime(kind);
+  }
+
+  return { visualDisplayed, soundPlayed };
 }
 
-async function playChime(kind = 'reset') {
+async function showNotification(kind, payload) {
+  const descriptor = getNotificationDescriptor(kind, payload);
+
+  try {
+    await chrome.notifications.create(`${descriptor.idPrefix}-${Date.now()}`, {
+      type: "basic",
+      iconUrl: "icons/icon128.png",
+      title: descriptor.title,
+      message: descriptor.message,
+      priority: 2,
+      requireInteraction: true,
+      silent: true
+    });
+    return true;
+  } catch (error) {
+    console.debug("Unable to create notification", error);
+    return false;
+  }
+}
+
+function getNotificationDescriptor(kind, payload = {}) {
+  const product = payload.product || "Reup";
+  const resetAt = payload.resetAt || Date.now();
+
+  if (kind === "early") {
+    return {
+      idPrefix: `early-${payload.site || "test"}`,
+      title: `${product} resets soon`,
+      message: `Usage should reset at ${formatLocalTime(resetAt)}.`
+    };
+  }
+
+  return {
+    idPrefix: `reset-${payload.site || "test"}`,
+    title: `${product} should be available again`,
+    message: "Your saved reset time has arrived."
+  };
+}
+
+async function createTestNotification(kind = "reset") {
+  const { settings: storedSettings } = await chrome.storage.local.get(["settings"]);
+  const settings = normalizeSettings(storedSettings);
+
+  const payload = {
+    site: "test",
+    product: kind === "early" ? "Claude" : "Codex",
+    resetAt: Date.now() + 5 * 60 * 1000
+  };
+
+  return sendAlert(kind === "early" ? "early" : "reset", payload, settings);
+}
+
+async function playChime(kind = "reset") {
   if (!chrome.offscreen?.createDocument) return false;
+
   try {
     await ensureOffscreenDocument();
-    const response = await chrome.runtime.sendMessage({ type: 'PLAY_CHIME', variant: kind });
+    const response = await chrome.runtime.sendMessage({ type: "PLAY_CHIME", variant: kind });
     return !!response?.ok;
   } catch (error) {
-    console.debug('Unable to play chime', error);
+    console.debug("Unable to play chime", error);
     return false;
   }
 }
 
 async function ensureOffscreenDocument() {
-  const offscreenUrl = chrome.runtime.getURL('offscreen.html');
+  const offscreenUrl = chrome.runtime.getURL("offscreen.html");
+
   if (chrome.runtime.getContexts) {
     const contexts = await chrome.runtime.getContexts({
-      contextTypes: ['OFFSCREEN_DOCUMENT'],
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
       documentUrls: [offscreenUrl]
     });
+
     if (contexts.length > 0) return;
   }
 
   await chrome.offscreen.createDocument({
-    url: 'offscreen.html',
-    reasons: ['AUDIO_PLAYBACK'],
-    justification: 'Play a short Reup chime for reset and test notifications.'
+    url: "offscreen.html",
+    reasons: ["AUDIO_PLAYBACK"],
+    justification: "Play a short Reup chime for reset and test notifications."
   });
 }

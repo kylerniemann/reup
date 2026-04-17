@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Reup",
-  "version": "0.1.1",
-  "description": "Notify me when ChatGPT, Claude, or Codex usage resets.",
+  "version": "0.2.0",
+  "description": "Track AI usage reset times on ChatGPT, Claude, and Codex with configurable alerts.",
   "minimum_chrome_version": "116",
   "permissions": [
     "storage",

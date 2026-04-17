@@ -7,50 +7,86 @@
   </head>
   <body>
     <main class="app">
-      <h1>Reup</h1>
-      <p class="sub">Tracks visible reset times on supported sites.</p>
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Chrome extension</p>
+          <h1>Reup</h1>
+          <p class="sub">Track visible reset timers on ChatGPT, Claude, and Codex without hovering over tabs all day.</p>
+        </div>
+        <div class="summaryPanel">
+          <span id="trackerCount" class="summaryValue">0</span>
+          <span class="summaryLabel">tracked resets</span>
+        </div>
+      </header>
 
       <section class="card">
-        <h2>Saved resets</h2>
-        <div id="watchers"></div>
+        <div class="sectionHead">
+          <div>
+            <h2>Saved resets</h2>
+            <p class="sectionIntro">Reup keeps the latest reset time it can see on each supported site.</p>
+          </div>
+        </div>
+        <div id="watchers" class="watcherList"></div>
       </section>
 
       <section class="card">
-        <h2>Settings</h2>
-        <label class="row">
-          <span>Notify early (minutes)</span>
+        <div class="sectionHead">
+          <div>
+            <h2>Alert preferences</h2>
+            <p class="sectionIntro">Choose whether Reup should show a banner, play a chime, or stay quiet.</p>
+          </div>
+        </div>
+
+        <label class="field">
+          <span class="fieldLabel">Early reminder</span>
+          <span class="fieldHelp">Notify this many minutes before the saved reset time.</span>
           <input id="notifyEarlyMinutes" type="number" min="0" max="120" step="1" />
         </label>
 
-        <label class="row checkbox">
-          <input id="notificationsEnabled" type="checkbox" />
-          <span>Enable notifications</span>
-        </label>
+        <div class="toggleGrid">
+          <label class="toggleCard">
+            <input id="visualNotificationsEnabled" type="checkbox" />
+            <span class="toggleBody">
+              <span class="toggleTitle">Show system banner</span>
+              <span class="toggleHelp">Display a Chrome notification when a reset is close or has arrived.</span>
+            </span>
+          </label>
 
-        <label class="row checkbox">
-          <input id="soundEnabled" type="checkbox" />
-          <span>Play Reup chime</span>
-        </label>
+          <label class="toggleCard">
+            <input id="soundEnabled" type="checkbox" />
+            <span class="toggleBody">
+              <span class="toggleTitle">Play Reup chime</span>
+              <span class="toggleHelp">Use Reup's built-in chime instead of relying on system notification sounds.</span>
+            </span>
+          </label>
+        </div>
 
-        <div class="buttonRow">
-          <button id="saveBtn">Save settings</button>
+        <p id="quietModeNote" class="note" hidden>Both banner and sound are off. Reup will still save reset times, but alerts will stay quiet until you turn one back on.</p>
+
+        <div class="buttonGrid">
+          <button id="saveBtn" type="button">Save settings</button>
           <button id="testResetBtn" type="button">Test reset alert</button>
           <button id="testSoonBtn" type="button">Test early alert</button>
-          <button id="testSoundBtn" type="button" class="secondary">Test chime</button>
+          <button id="testSoundBtn" type="button" class="secondary">Test chime only</button>
         </div>
-        <p id="status"></p>
+        <p id="status" class="status" role="status"></p>
       </section>
 
       <section class="card">
-        <h2>Notification check</h2>
-        <div id="permissionPill" class="pill">Checking…</div>
+        <div class="sectionHead">
+          <div>
+            <h2>Notification check</h2>
+            <p class="sectionIntro">Use this when test alerts do not appear the way you expect.</p>
+          </div>
+          <div id="permissionPill" class="pill">Checking...</div>
+        </div>
         <p class="small" id="permissionExplain"></p>
         <div class="helpList">
-          <div><strong>Mac:</strong> System Settings → Notifications → Google Chrome → Allow Notifications</div>
-          <div><strong>Windows:</strong> Settings → System → Notifications → Google Chrome → On</div>
-          <div><strong>Also check:</strong> turn off Focus / Do Not Disturb, and make sure Chrome itself is allowed to show notifications.</div>
+          <div><strong>Mac:</strong> System Settings > Notifications > Google Chrome > Allow Notifications</div>
+          <div><strong>Windows:</strong> Settings > System > Notifications > Google Chrome > On</div>
+          <div><strong>Also check:</strong> Focus / Do Not Disturb, Chrome notification permissions, and your audio output device.</div>
         </div>
-        <p class="small">After changing those settings, click a test button above again.</p>
+        <p class="small footerNote">The alert test buttons above follow your saved banner and chime switches. "Test chime only" always plays the Reup sound directly.</p>
       </section>
     </main>
 
